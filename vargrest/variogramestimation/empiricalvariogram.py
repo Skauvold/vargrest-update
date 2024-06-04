@@ -16,17 +16,19 @@ def _nanvar(arr: np.ndarray) -> float:
     nonnan_diffs = arr[~np.isnan(arr)]
     nonnan_diffs -= np.mean(nonnan_diffs)
     if nonnan_diffs.size > 0:
-        return np.sum(nonnan_diffs ** 2) / nonnan_diffs.size
+        return np.sum(nonnan_diffs**2) / nonnan_diffs.size
     else:
         return np.nan
 
 
-def _estimate_variogram_3d_single_lag(rf: np.ndarray,
-                                      rf_nan: np.ndarray,
-                                      h_x: int,
-                                      h_y: int,
-                                      h_z: int,
-                                      sub_sampling: Optional[int] = None) -> Tuple[float, int]:
+def _estimate_variogram_3d_single_lag(
+    rf: np.ndarray,
+    rf_nan: np.ndarray,
+    h_x: int,
+    h_y: int,
+    h_z: int,
+    sub_sampling: Optional[int] = None,
+) -> Tuple[float, int]:
     """
     Faster estimation of variance at a single lag distance combination (h_x, h_y, h_z)
     :param rf: Random field
@@ -38,6 +40,7 @@ def _estimate_variogram_3d_single_lag(rf: np.ndarray,
     :return: gamma: variogram value for given combination of lags
     :return n: number of cell differences used to compute gamma
     """
+
     def _slice(_h):
         if _h < 0:
             return slice(-_h, None)
@@ -86,14 +89,12 @@ def _estimate_variogram_3d_single_lag(rf: np.ndarray,
     if diff.size == 0:
         return np.nan, 0
     else:
-        return np.sum(diff ** 2) / diff.size, diff.size
+        return np.sum(diff**2) / diff.size, diff.size
 
 
-def _estimate_variogram_np_3d_dense(rf: np.ndarray,
-                                    x_lag: int,
-                                    y_lag: int,
-                                    z_lag: int,
-                                    sub_sampling: Optional[int]) -> Tuple[np.ndarray, np.ndarray]:
+def _estimate_variogram_np_3d_dense(
+    rf: np.ndarray, x_lag: int, y_lag: int, z_lag: int, sub_sampling: Optional[int]
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute a nonparametric variogram estimate over a 3D mesh
     of x, y and z lags
@@ -109,7 +110,9 @@ def _estimate_variogram_np_3d_dense(rf: np.ndarray,
     y_lags_sequence = range(-y_lag, y_lag + 1)
     z_lags_sequence = range(0, z_lag + 1)
 
-    varmap = np.full(shape=(2 * x_lag + 1, 2 * y_lag + 1, 2 * z_lag + 1), fill_value=np.nan)
+    varmap = np.full(
+        shape=(2 * x_lag + 1, 2 * y_lag + 1, 2 * z_lag + 1), fill_value=np.nan
+    )
     counts = np.zeros_like(varmap, dtype=int)
 
     if rf.ndim != 3:
@@ -118,11 +121,17 @@ def _estimate_variogram_np_3d_dense(rf: np.ndarray,
     # rf_t = np.transpose(rf, (1, 0, 2))
 
     rf_nan = np.isnan(rf)
-    for i, h_x in progress(enumerate(x_lags_sequence), 'Estimating empirical variogram', len(x_lags_sequence)):
+    for i, h_x in progress(
+        enumerate(x_lags_sequence),
+        "Estimating empirical variogram",
+        len(x_lags_sequence),
+    ):
         for j, h_y in enumerate(y_lags_sequence):
             # Calculate half of k-index and mirror the array afterwards
             for k, h_z in enumerate(z_lags_sequence, start=z_lag):
-                varmap_ijk, counts_ijk = _estimate_variogram_3d_single_lag(rf, rf_nan, h_x, h_y, h_z, sub_sampling)
+                varmap_ijk, counts_ijk = _estimate_variogram_3d_single_lag(
+                    rf, rf_nan, h_x, h_y, h_z, sub_sampling
+                )
                 varmap[i, j, k] = varmap_ijk
                 counts[i, j, k] = counts_ijk
 
@@ -131,10 +140,12 @@ def _estimate_variogram_np_3d_dense(rf: np.ndarray,
     return varmap, counts
 
 
-def _estimate_variogram_np_3d_sparse(rf: np.ndarray,
-                                     x_lags_min_max_step: Tuple[int, int, int],
-                                     y_lags_min_max_step: Tuple[int, int, int],
-                                     z_lags_min_max_step: Tuple[int, int, int]) -> Tuple[np.ndarray, np.ndarray]:
+def _estimate_variogram_np_3d_sparse(
+    rf: np.ndarray,
+    x_lags_min_max_step: Tuple[int, int, int],
+    y_lags_min_max_step: Tuple[int, int, int],
+    z_lags_min_max_step: Tuple[int, int, int],
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute a nonparametric variogram estimate over a 3D mesh
     of x, y and z lags, skipping some cells for speed
@@ -145,6 +156,7 @@ def _estimate_variogram_np_3d_sparse(rf: np.ndarray,
     :return varmap: Variogram estimate at specified lags. 2D numpy array
     :return counts: Number of data points used to compute each element of varmap
     """
+
     def _lag_iter(start, end, step):
         max_lag = end + step - (end % step)
         return -max_lag, max_lag + 1, step
@@ -154,9 +166,14 @@ def _estimate_variogram_np_3d_sparse(rf: np.ndarray,
     y_lag_iter = _lag_iter(*y_lags_min_max_step)
     z_lag_iter = _lag_iter(*z_lags_min_max_step)
 
-    varmap = np.full(shape=(x_lag_iter[1] - x_lag_iter[0],
-                            y_lag_iter[1] - y_lag_iter[0],
-                            z_lag_iter[1] - z_lag_iter[0]), fill_value=np.nan)
+    varmap = np.full(
+        shape=(
+            x_lag_iter[1] - x_lag_iter[0],
+            y_lag_iter[1] - y_lag_iter[0],
+            z_lag_iter[1] - z_lag_iter[0],
+        ),
+        fill_value=np.nan,
+    )
     counts = np.zeros_like(varmap, dtype=int)
 
     if rf.ndim != 3:
@@ -171,18 +188,23 @@ def _estimate_variogram_np_3d_sparse(rf: np.ndarray,
     for i, h_x in enumerate(range(*x_lag_iter)):
         for j, h_y in enumerate(range(*y_lag_iter)):
             for k, h_z in enumerate(range(*z_lag_iter)):
-                varmap_si_sj_sk, counts_si_sj_sk = _estimate_variogram_3d_single_lag(rf_t, rf_nan, h_x, h_y, h_z)
+                varmap_si_sj_sk, counts_si_sj_sk = _estimate_variogram_3d_single_lag(
+                    rf_t, rf_nan, h_x, h_y, h_z
+                )
                 varmap[i * x_step, j * y_step, k * z_step] = varmap_si_sj_sk
                 counts[i * x_step, j * y_step, k * z_step] = counts_si_sj_sk
 
     return varmap, counts
 
-def _estimate_variogram_np_3d_random(rf: np.ndarray,
-                                     x_lag: int,
-                                     y_lag: int,
-                                     z_lag: int,
-                                     sampling_factor: Optional[float] = 0.10,
-                                     max_samples: Optional[int] = 50000) -> Tuple[np.ndarray, np.ndarray]:
+
+def _estimate_variogram_np_3d_random(
+    rf: np.ndarray,
+    x_lag: int,
+    y_lag: int,
+    z_lag: int,
+    sampling_factor: Optional[float] = 0.10,
+    max_samples: Optional[int] = 50000,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute a nonparametric variogram estimate over a 3D mesh
     of x, y and z lags, sampling only some cells for speed
@@ -224,7 +246,9 @@ def _estimate_variogram_np_3d_random(rf: np.ndarray,
         h_x = x_lags_sequence[i]
         h_y = y_lags_sequence[j]
         h_z = z_lags_sequence[k]
-        varmap_ijk, counts_ijk = _estimate_variogram_3d_single_lag(rf_t, rf_nan, h_x, h_y, h_z)
+        varmap_ijk, counts_ijk = _estimate_variogram_3d_single_lag(
+            rf_t, rf_nan, h_x, h_y, h_z
+        )
 
         if not np.isnan(varmap_ijk):
             varmap[i, j, k] = varmap_ijk

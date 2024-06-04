@@ -48,7 +48,7 @@ def fit_3d_field(func, jac, array, resolution, counts, par_guess, bounds, sigma_
     xv = np.linspace(xmin, xmax, nx)
     yv = np.linspace(ymin, ymax, ny)
     zv = np.linspace(zmin, zmax, nz)
-    xm, ym, zm = np.meshgrid(xv, yv, zv, indexing='ij')
+    xm, ym, zm = np.meshgrid(xv, yv, zv, indexing="ij")
 
     indep_data = np.vstack((xm.ravel(), ym.ravel(), zm.ravel()))
     dep_data = array.ravel()
@@ -74,13 +74,15 @@ def fit_3d_field(func, jac, array, resolution, counts, par_guess, bounds, sigma_
         dsq = xmv**2 + ymv**2 + zmv**2
         wts = np.exp(-wt_coef * dsq)
         wts = _transform_array(wts, 2)
-        #wts = wts / wts.sum()
+        # wts = wts / wts.sum()
         sig = np.divide(1.0, wts, out=np.full_like(wts, np.inf), where=wts != 0.0)
     else:
         sig = None
 
     # Least-squares fit
-    popt = curve_fit(func, indep_data, dep_data, sigma=sig, p0=par_guess, bounds=bounds, jac=jac)[0]
+    popt = curve_fit(
+        func, indep_data, dep_data, sigma=sig, p0=par_guess, bounds=bounds, jac=jac
+    )[0]
 
     # Calculate quality of solution
     quality = _calculate_quality_1(func, indep_data, dep_data, popt, not_nan, array)
@@ -103,7 +105,9 @@ def _calculate_quality(func, indep_data, dep_data, parameters, not_nan, array):
     z_err /= max_val
     qth = 0.15
     quality = (x_err < qth).sum() + (y_err < qth).sum() + (z_err < qth).sum()
-    quality /= (~np.isnan(x_err)).sum() + (~np.isnan(y_err)).sum() + (~np.isnan(z_err)).sum()
+    quality /= (
+        (~np.isnan(x_err)).sum() + (~np.isnan(y_err)).sum() + (~np.isnan(z_err)).sum()
+    )
     return quality
 
 
@@ -154,21 +158,21 @@ def _center_slice(array):
 
 
 def _transform_array(x, n):
-    x_below = 2**(n-1) * np.power(x, n)
-    x_above = 1.0 - 2**(n-1) * np.power(1 - x, n)
+    x_below = 2 ** (n - 1) * np.power(x, n)
+    x_above = 1.0 - 2 ** (n - 1) * np.power(1 - x, n)
     return np.where(x < 0.5, x_below, x_above)
 
 
 def find_dominant_direction(variogram_map, grid_resolution):
-    n_angles = 24   # Number of angles to check
-    n_dists = 21    # Number of lag distance points to evaluate integrand at
+    n_angles = 24  # Number of angles to check
+    n_dists = 21  # Number of lag distance points to evaluate integrand at
 
     dx = grid_resolution[0]
     dy = grid_resolution[1]
     nx = variogram_map.shape[0]
     ny = variogram_map.shape[1]
 
-    if variogram_map.ndim == 3:     # If 3D, extract middle horizontal slice
+    if variogram_map.ndim == 3:  # If 3D, extract middle horizontal slice
         nz = variogram_map.shape[2]
         if nz % 2 == 1:
             g = variogram_map[:, :, nz // 2]
@@ -181,26 +185,30 @@ def find_dominant_direction(variogram_map, grid_resolution):
     elif variogram_map.ndim == 2:
         g = variogram_map
     else:
-        raise NotImplementedError('Dominant direction not implemented for other than 2D and 3D')
+        raise NotImplementedError(
+            "Dominant direction not implemented for other than 2D and 3D"
+        )
 
     if np.all(np.isnan(g)):
         return 0.0
 
     xlength = (nx - 1) * dx
     ylength = (ny - 1) * dy
-    h_max = 0.5 * min(xlength, ylength)    # Limiting distance (upper limit of integration)
+    h_max = 0.5 * min(
+        xlength, ylength
+    )  # Limiting distance (upper limit of integration)
     hh = np.linspace(0.0, h_max, n_dists)
     hxx = np.linspace(-0.5 * xlength, 0.5 * xlength, nx)
     hyy = np.linspace(-0.5 * ylength, 0.5 * ylength, ny)
 
-    hxx, hyy = np.meshgrid(hxx, hyy, indexing='ij')
+    hxx, hyy = np.meshgrid(hxx, hyy, indexing="ij")
 
     hxx = hxx.ravel()  # Flatten input
     hyy = hyy.ravel()
     gg = g.ravel()
 
     ggnans = np.isnan(gg.astype(float))
-    hxx = hxx[~ggnans]   # Filter out nans
+    hxx = hxx[~ggnans]  # Filter out nans
     hyy = hyy[~ggnans]
     gg = gg[~ggnans]
     hxxyy = np.vstack((hxx, hyy)).transpose()
@@ -209,17 +217,19 @@ def find_dominant_direction(variogram_map, grid_resolution):
     integrals = np.empty_like(azimuths)
 
     interpolator = LinearNDInterpolator(hxxyy, gg)
-    for i, azi in enumerate(azimuths):      # Loop over angles
+    for i, azi in enumerate(azimuths):  # Loop over angles
         hxx_i = np.cos(azi) * hh
         hyy_i = np.sin(azi) * hh
         gg_i = interpolator(hxx_i, hyy_i)
-        integrals[i] = trapz(y=gg_i, x=hh)   # Compute approximate integral from 0 to h_max
+        integrals[i] = trapz(
+            y=gg_i, x=hh
+        )  # Compute approximate integral from 0 to h_max
 
-    if np.all(np.isnan(integrals)):     # Get index of smallest integral
+    if np.all(np.isnan(integrals)):  # Get index of smallest integral
         return 0.0
     elif np.any(np.isnan(integrals)):
         i_min = np.nanargmin(integrals)
     else:
         i_min = np.argmin(integrals)
 
-    return azimuths[i_min]              # Return corresponding azimuth
+    return azimuths[i_min]  # Return corresponding azimuth

@@ -3,7 +3,9 @@ from typing import List, Callable, Optional
 import numpy as np
 
 
-def approximate_porosity(grain_sizes: List[np.ndarray], q_values: List[float]) -> np.ndarray:
+def approximate_porosity(
+    grain_sizes: List[np.ndarray], q_values: List[float]
+) -> np.ndarray:
     # Get quantiles most closely surrounding 0.25 and 0.75
     q_a = max(q for q in q_values if q <= 0.25)
     q_b = min(q for q in q_values if q >= 0.25)
@@ -42,7 +44,9 @@ def _resample_trace(elev_ij, prop_ij, n_grid, v_res) -> Optional[np.ndarray]:
     if np.all(np.isnan(prop_ij)):
         return None
     # Filter out negative and zero-volume cells
-    vols_ij = np.diff(elev_ij, append=np.inf)  # p (artificial cell appended to do proper filtering)
+    vols_ij = np.diff(
+        elev_ij, append=np.inf
+    )  # p (artificial cell appended to do proper filtering)
     zero_vols = vols_ij <= 0.0
     elev_ij = elev_ij[~zero_vols]  # n
     prop_ij = prop_ij[~zero_vols[:-1]]  # n - 1
@@ -77,7 +81,7 @@ def _resample_trace(elev_ij, prop_ij, n_grid, v_res) -> Optional[np.ndarray]:
 
     # Define the full concatenated grid, the corresponding values and volumes
     full_prop_ij = prop_ij[left_cell]  # (nf,)
-    sorted_elev_ij = full_elev_ij[order_ij][:full_prop_ij.size + 1]  # (nf + 1,)
+    sorted_elev_ij = full_elev_ij[order_ij][: full_prop_ij.size + 1]  # (nf + 1,)
     full_vols_ij = np.diff(sorted_elev_ij)  # nf
 
     # Remove cells in the concatenated grid that have nan-values
@@ -118,14 +122,16 @@ def _resample_trace(elev_ij, prop_ij, n_grid, v_res) -> Optional[np.ndarray]:
 # TODO: Enable output grid to differ from input grid
 # If dx and dy are different in the input grid, sample onto a grid with dx = dy
 # Allow output grid to be rotated relative to input grid (for local estimation in a specified rectangle)
-def resample_onto_regular_grid(elev: np.ndarray,
-                               prop: np.ndarray,
-                               vres: float) -> np.ndarray:
+def resample_onto_regular_grid(
+    elev: np.ndarray, prop: np.ndarray, vres: float
+) -> np.ndarray:
     n_t, n_x, n_y = elev.shape
     top = np.max(elev)
     if top > 30.0:
-        print(f'NB! The vertical thickness of the estimation grid is high ({top}m). Consider inspecting the pillars for'
-              f' unintended high values')
+        print(
+            f"NB! The vertical thickness of the estimation grid is high ({top}m). Consider inspecting the pillars for"
+            f" unintended high values"
+        )
     n_z = int(np.round(top / vres))
 
     prop_reg = np.empty(shape=(n_x, n_y, n_z))
@@ -142,7 +148,7 @@ def resample_onto_regular_grid(elev: np.ndarray,
             prop_reg_ij = _resample_trace(elev_ij, prop_ij, k_max_ij + 2, vres)
             if prop_reg_ij is None:
                 continue
-            prop_reg[i, j, :prop_reg_ij.size] = prop_reg_ij
+            prop_reg[i, j, : prop_reg_ij.size] = prop_reg_ij
 
     return prop_reg
 
